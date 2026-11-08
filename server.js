@@ -60,8 +60,8 @@ app.post('/api/telegram/webhook',async(req,res)=>{
     const r=await pool.query('UPDATE applications SET status=$1 WHERE id=$2 RETURNING full_name',[decision,id]);
     if(!r.rowCount){await telegramCall('answerCallbackQuery',{callback_query_id:q.id,text:'Application record was not found.'});return;}
     const label=decision==='accepted'?'✅ APPLICATION ACCEPTED':'❌ APPLICATION REJECTED';
-    const original=String(q.message.text||'').replace(/\\n📌 Status:.*$/s,'');
-    await telegramCall('editMessageText',{chat_id:q.message.chat.id,message_id:q.message.message_id,text:original+'\\n\\n'+label+'\\n📌 Decision recorded: '+new Date().toISOString(),reply_markup:{inline_keyboard:[]}});
+    const original=String(q.message.text||'').replace(/\n📌 Status:.*$/s,'');
+    await telegramCall('editMessageText',{chat_id:q.message.chat.id,message_id:q.message.message_id,text:original+'\n\n'+label+'\n📌 Decision recorded: '+new Date().toISOString(),reply_markup:{inline_keyboard:[]}});
     await telegramCall('answerCallbackQuery',{callback_query_id:q.id,text:decision==='accepted'?'Application accepted.':'Application rejected.'});
   }catch(error){console.error('Telegram decision handling failed:',error.message);try{await telegramCall('answerCallbackQuery',{callback_query_id:q.id,text:'Could not save decision. Please try again.'});}catch{}}
 });
