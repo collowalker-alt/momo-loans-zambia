@@ -1,3 +1,8 @@
+const API_BASE='https://momo-loans-zambia-api.onrender.com';
+// Start waking the free API and its database as soon as the page loads.
+// This runs in the background so it does not block the landing page.
+fetch(API_BASE+'/health',{cache:'no-store'}).catch(()=>{});
+
 const amount=document.getElementById('amount');
 const months=document.getElementById('months');
 const fmt=n=>Math.round(n).toLocaleString('en-US');
@@ -76,7 +81,7 @@ form.addEventListener('submit',async event=>{
   submit.disabled=true;
   submit.setAttribute('aria-busy','true');
   try{
-    const response=await fetch('https://momo-loans-zambia-api.onrender.com/api/applications',{
+    const response=await fetch(API_BASE+'/api/applications',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
