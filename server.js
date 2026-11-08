@@ -78,4 +78,19 @@ app.post('/api/applications',async(req,res)=>{try{
 app.get('/api/admin/applications',async(req,res)=>{if(!process.env.ADMIN_TOKEN||req.headers.authorization!==`Bearer ${process.env.ADMIN_TOKEN}`)return res.sendStatus(401);try{const r=await pool.query('SELECT id,full_name,phone,email,loan_type,amount,term_months,created_at,status,notes FROM applications ORDER BY created_at DESC LIMIT 500');res.json({applications:r.rows});}catch{res.status(503).json({error:'Unable to retrieve applications.'});}});
 app.post('/api/admin/applications/:id/update',async(req,res)=>{if(!process.env.ADMIN_TOKEN||req.headers.authorization!==`Bearer ${process.env.ADMIN_TOKEN}`)return res.sendStatus(401);const id=String(req.params.id||'');const status=String(req.body?.status||'');const notes=String(req.body?.notes||'');if(!/^[0-9a-f-]{36}$/i.test(id)||!['new','contacted','under_review','accepted','approved','rejected'].includes(status)||notes.length>3000)return res.status(400).json({error:'Invalid application update.'});try{const r=await pool.query('UPDATE applications SET status=$1,notes=$2 WHERE id=$3 RETURNING id,status,notes',[status,notes,id]);if(!r.rowCount)return res.sendStatus(404);res.json({ok:true,application:r.rows[0]});}catch(e){console.error('Admin update failed',e.message);res.status(503).json({error:'Unable to update application.'});}});
 
-init().then(async()=>{const server=app.listen(process.env.PORT||10000,'0.0.0.0');const token=process.env.TELEGRAM_BOT_TOKEN;if(token&&process.env.ADMIN_TOKEN){try{await telegramCall('setWebhook',{url:'https://momo-loans-zambia-api.onrender.com/api/telegram/webhook',secret_token:process.env.ADMIN_TOKEN,allowed_updates:['message','callback_query'],drop_pending_updates:false});console.log('Telegram decision webhook configured');}catch(e){console.error('Telegram webhook setup failed:',e.message);}}return server;}).catch(e=>{console.error('Database initialization failed',e.message);process.exit(1);});
+async function registerTelegramWebhook(attempt=1){
+  const token=process.env.TELEGRAM_BOT_TOKEN;
+  if(!token||!process.env.ADMIN_TOKEN)return;
+  try{
+    await telegramCall('setWebhook',{url:'https://momo-loans-zambia-api.onrender.com/api/telegram/webhook',secret_token:process.env.ADMIN_TOKEN,allowed_updates:['message','callback_query'],drop_pending_updates:false});
+    console.log('Telegram decision webhook configured');
+  }catch(e){
+    console.error('Telegram webhook setup failed (attempt '+attempt+'): '+e.message);
+    if(attempt<6)setTimeout(()=>registerTelegramWebhook(attempt+1),Math.min(60000,5000*Math.pow(2,attempt-1))).unref?.();
+  }
+}
+init().then(()=>{
+  const server=app.listen(process.env.PORT||10000,'0.0.0.0');
+  registerTelegramWebhook();
+  return server;
+}).catch(e=>{console.error('Database initialization failed',e.message);process.exit(1);});
